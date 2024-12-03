@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laberinto Interactivo</title>
+    <style>
+
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #a8ccf0;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 20px 0;
+            color: #2c3e50;
+            font-size: 2.5rem;
+            font-family: cursive;
+        }
+        h3 {
+            text-align: center;
+            margin: 20px 0;
+            color: #2c3e50;
+            font-family:Verdana, Geneva, Tahoma, sans-serif;
+        }
+
+        div {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            color: #333;
+            cursor: not-allowed;
+        }
+        button:hover:not(:disabled) {
+            background-color: #2980b9;
+            transform: scale(1.05);
+        }
+        canvas {
+            background-color: #ecf0f1;
+            border: 2px solid #2c3e50;
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <h1>Laberinto Interactivo</h1>
+    <h3>Para poder salir de el laberinto, recolecta las tres flores</h3>
+    <div>
+        <button id="iniciarLaberinto">Iniciar Laberinto</button>
+        <button id="reiniciarJuego" disabled>Reiniciar</button>
+        <button id="pausarJuego" disabled>Pausar</button>
+        <button id="reanudarJuego" disabled>Reanudar</button>
+    </div>
+    <canvas id="laberintoCanvas" width="990" height="990"></canvas>
+    <script>
+        // Variables para controlar el estado del juego 
+        let juegoIniciado = false;
+        let juegoPausado = false;
+        let intervaloEnemigos = null;
+
+        // Referencias a los botones
+        const botonIniciar = document.getElementById('iniciarLaberinto');
+        const botonReiniciar = document.getElementById('reiniciarJuego');
+        const botonPausar = document.getElementById('pausarJuego');
+        const botonReanudar = document.getElementById('reanudarJuego');
+
+        // Función para manejar el movimiento del jugador
+        function manejarMovimiento(event) {
+            if (!juegoIniciado || juegoPausado) return; 
+            console.log(`Tecla presionada: ${event.key}`);
+            if (event.key === 'ArrowUp') mover_jugador('up');
+            else if (event.key === 'ArrowDown') mover_jugador('down');
+            else if (event.key === 'ArrowLeft') mover_jugador('left');
+            else if (event.key === 'ArrowRight') mover_jugador('right');
+        }
+
+        // Agregar el evento `keydown` solo una vez
+        document.addEventListener('keydown', manejarMovimiento);
+
+        // Función para iniciar el laberinto
+        function iniciarJuego() {
+            if (!juegoIniciado) {
+                juegoIniciado = true;
+                juegoPausado = false;
+                botonIniciar.disabled = true;
+                botonReiniciar.disabled = false;
+                botonPausar.disabled = false;
+                botonReanudar.disabled = true;
+
+                // Colocar premios y dibujar el laberinto inicial
+                colocar_premios();
+                dibujar_laberinto1();
+
+                // Iniciar el movimiento de los enemigos
+                intervaloEnemigos = setInterval(mover_enemigos, 300);
+            }
+        }
+        // Función para reiniciar el juego
+        function reiniciarJuego() {
+            location.reload();
+        }
+
+        // Función para pausar el juego
+        function pausarJuego() {
+            if (!juegoPausado) {
+                juegoPausado = true;
+                clearInterval(intervaloEnemigos); 
+                botonPausar.disabled = true;
+                botonReanudar.disabled = false;
+            }
+        }
+
+        // Función para reanudar el juego
+        function reanudarJuego() {
+            if (juegoPausado) {
+                juegoPausado = false;
+                intervaloEnemigos = setInterval(mover_enemigos, 300); 
+                botonPausar.disabled = false;
+                botonReanudar.disabled = true;
+            }
+        }
+
+        // Asignar eventos a los botones
+        botonIniciar.addEventListener('click', iniciarJuego);
+        botonReiniciar.addEventListener('click', reiniciarJuego);
+        botonPausar.addEventListener('click', pausarJuego);
+        botonReanudar.addEventListener('click', reanudarJuego);
+
+
+        const laberinto = [
+            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+            [0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+            [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1],
+            [1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1],
+            [1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1],
+            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 3],
+            [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+            [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ];
+    
+
+        // referencia al canvas
+        const canvas = document.getElementById('laberintoCanvas');
+        const ctx = canvas.getContext('2d');
+        // Tamaño de cada celda en píxeles ancho y alto
+        const cellWidth = 45;
+        const cellHeight = 45;
+
+
+       // Definir las imágenes para cada tipo de celda
+        const imagenes = {
+            0: './imagenes/camino.png', // Espacio vacío
+            1: './imagenes/obs.png', // Obstáculo
+            3: './imagenes/sal.png',//salida
+            premio: './imagenes/premio.png',
+            jugador: './imagenes/esc.png',
+            enemigo: './imagenes/rep.png' 
+            
+        };
+
+        let imagenesCargadas = {};
+        let imagenesPorCargar = Object.keys(imagenes).length;
+        
+        for (let key in imagenes) {
+            const img = new Image();
+            img.src = imagenes[key];
+            img.onload = () => {
+                console.log(`Imagen cargada: ${imagenes[key]}`);
+                imagenesCargadas[key] = img;
+                imagenesPorCargar--;
+                if (imagenesPorCargar === 0) {
+                    dibujar_laberinto1();
+                }
+            };
+            img.onerror = () => {
+                console.error(`No se pudo cargar la imagen: ${imagenes[key]}`);
+            };
+        }
+        
+        const cuadrantes = [
+            { rowMin: 0, rowMax: 10, colMin: 0, colMax: 10 },  // Cuadrante superior izquierdo
+            { rowMin: 0, rowMax: 10, colMin: 11, colMax: 21 }, // Cuadrante superior derecho
+            { rowMin: 11, rowMax: 21, colMin: 0, colMax: 10 }, // Cuadrante inferior izquierdo
+            { rowMin: 11, rowMax: 21, colMin: 11, colMax: 21 } // Cuadrante inferior derecho
+        ];
+
+        let enemigos = [
+            { row: 3, col: 3, cuadrante: cuadrantes[0] },
+            { row: 3, col: 18, cuadrante: cuadrantes[1] },
+            { row: 18, col: 2, cuadrante: cuadrantes[2] },
+            { row: 18, col: 17, cuadrante: cuadrantes[3] }
+        ];
+
+        
+       // Encontrar una posición inicial válida (cualquier celda con valor 0)
+        function obtener_posicion_inicial() {
+            for (let row = 0; row < laberinto.length; row++) {
+                for (let col = 0; col < laberinto[row].length; col++) {
+                    if (laberinto[row][col] === 0) {
+                       //posición detectada
+                        return { row, col };
+                    }
+                }
+            }
+           // regresa la esquina superior izquierda si no hay alguna posición donde hay un 0
+        return { row: 0, col: 0 };
+        }
+
+
+        pos_jugador = obtener_posicion_inicial();
+        console.log(pos_jugador);
+
+        function dibujar_laberinto1() {
+            // Dibujar las celdas del laberinto
+            for (let row = 0; row < laberinto.length; row++) {
+                for (let col = 0; col < laberinto[row].length; col++) {
+                    const valor_en_celda = laberinto[row][col];
+                    const x = col * cellWidth;
+                    const y = row * cellHeight;
+        
+                    // Dibujar la imagen correspondiente
+                    const img = imagenesCargadas[valor_en_celda];
+                    if (img) {
+                        ctx.drawImage(img, x, y, cellWidth, cellHeight);
+                    }
+                }
+            }
+        
+            // Dibujar al jugador
+            const { row: playerRow, col: playerCol } = pos_jugador;
+            const playerX = playerCol * cellWidth;
+            const playerY = playerRow * cellHeight;
+            const jugadorImg = imagenesCargadas.jugador;
+            ctx.drawImage(jugadorImg, playerX, playerY, cellWidth, cellHeight);
+        
+            // Dibujar a cada uno de los enemigos
+            enemigos.forEach((enemigo) => {
+                const { row: enemyRow, col: enemyCol } = enemigo;
+                const enemyX = enemyCol * cellWidth;
+                const enemyY = enemyRow * cellHeight;
+                const enemigoImg = imagenesCargadas.enemigo;
+                ctx.drawImage(enemigoImg, enemyX, enemyY, cellWidth, cellHeight);
+            });
+        }
+
+        function mover_enemigos() {
+            enemigos.forEach((enemigo, index) => {
+                const cuadrante = cuadrantes[index];
+        
+                // Inicializar la memoria de exploración si no existe
+                if (!enemigo.stack) {
+                    enemigo.stack = [];
+                    enemigo.explorado = new Set(); 
+                }
+        
+                // Si la pila está vacía, reiniciar para explorar nuevamente
+                if (enemigo.stack.length === 0) {
+                    enemigo.explorado.clear(); 
+                    enemigo.stack.push({ row: enemigo.row, col: enemigo.col }); 
+                    enemigo.explorado.add(`${enemigo.row},${enemigo.col}`);
+                }
+        
+                // Formatear la posición actual como cadena para el Set
+                const posActual = `${enemigo.row},${enemigo.col}`;
+        
+                if (!enemigo.explorado.has(posActual)) {
+                    enemigo.explorado.add(posActual);
+                    enemigo.stack.push({ row: enemigo.row, col: enemigo.col });
+                }
+        
+                // Buscar una celda vecina no explorada
+                const direcciones = [
+                    { row: -1, col: 0 }, // Arriba
+                    { row: 1, col: 0 },  // Abajo
+                    { row: 0, col: -1 }, // Izquierda
+                    { row: 0, col: 1 }   // Derecha
+                ];
+        
+                let nuevaPos = null;
+        
+                for (const dir of direcciones) {
+                    const newRow = enemigo.row + dir.row;
+                    const newCol = enemigo.col + dir.col;
+        
+                    // Validar que la nueva posición esté dentro del cuadrante y no explorada
+                    if (
+                        newRow >= cuadrante.rowMin && newRow <= cuadrante.rowMax &&
+                        newCol >= cuadrante.colMin && newCol <= cuadrante.colMax &&
+                        (laberinto[newRow][newCol] === 0 || laberinto[newRow][newCol]=== 'premio' ) && 
+                        !enemigo.explorado.has(`${newRow},${newCol}`) // No explorada aún
+                    ) {
+                        nuevaPos = { row: newRow, col: newCol };
+                        break;
+                    }
+                }
+        
+                if (nuevaPos) {
+                    // Mover a la nueva posición
+                    enemigo.row = nuevaPos.row;
+                    enemigo.col = nuevaPos.col;
+                } else if (enemigo.stack.length > 0) {
+                    // Retroceder si no hay nuevas posiciones por explorar
+                    const retroceso = enemigo.stack.pop();
+                    enemigo.row = retroceso.row;
+                    enemigo.col = retroceso.col;
+                }
+        
+                // Reinicio del ciclo de exploración
+                if (enemigo.stack.length === 0) {
+                    enemigo.explorado.clear();
+                    enemigo.stack.push({ row: enemigo.row, col: enemigo.col });
+                }
+        
+                // Comprobar si el enemigo atrapa al jugador
+                if (enemigo.row === pos_jugador.row && enemigo.col === pos_jugador.col) {
+                    setTimeout(() => {
+                        alert('¡El enemigo te atrapó! Reiniciando el juego...');
+                        location.reload(); 
+                    }, 400); 
+                }
+            });
+            dibujar_laberinto1();
+        }
+        
+        const TOTAL_PREMIOS = 3;
+        let premiosRecolectados = 0;
+
+        // Función para colocar premios en posiciones aleatorias
+        function colocar_premios() {
+            let premiosColocados = 0;
+            while (premiosColocados < TOTAL_PREMIOS) {
+                const row = Math.floor(Math.random() * laberinto.length);
+                const col = Math.floor(Math.random() * laberinto[0].length);
+                if (laberinto[row][col] === 0) {
+                    laberinto[row][col] = 'premio'; 
+                    premiosColocados++;
+                }
+            }
+        }
+
+        function mover_jugador(direction) {
+            const { row, col } = pos_jugador;
+            let newRow = row;
+            let newCol = col;
+
+            // Calcular nueva posición
+            if (direction === 'up') newRow--;
+            else if (direction === 'down') newRow++;
+            else if (direction === 'left') newCol--;
+            else if (direction === 'right') newCol++;
+
+            console.log(`Intentando mover jugador a: (${newRow}, ${newCol})`);
+
+            // Validar límites del laberinto
+            if (
+                newRow >= 0 && newRow < laberinto.length &&
+                newCol >= 0 && newCol < laberinto[0].length
+            ) {
+                const celdaDestino = laberinto[newRow][newCol];
+                console.log(`Celda destino: ${celdaDestino}`);
+
+                // Manejar diferentes casos de celdas
+                if (celdaDestino === 0) { 
+                    pos_jugador = { row: newRow, col: newCol };
+
+                } else if (celdaDestino === 'premio') { 
+                    pos_jugador = { row: newRow, col: newCol };
+                    laberinto[newRow][newCol] = 0;
+                    premiosRecolectados++;
+                    console.log(`Premios recolectados: ${premiosRecolectados}`);
+
+                } else if (celdaDestino === 3) {  
+                    if (premiosRecolectados === TOTAL_PREMIOS) {
+                        alert('¡Felicidades! Has salido del laberinto.'); 
+                        location.reload();
+                    } else {
+                        alert(`Te faltan ${TOTAL_PREMIOS - premiosRecolectados} premios para salir.`);
+                    }
+                }
+            }
+            dibujar_laberinto1();
+        }
+    </script>
+</body>
+</html>
